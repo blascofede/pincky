@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>PINCKY - Optimizado</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+        .game-container {
+            position: relative;
+            width: 100vw; /* Ocupa todo el ancho de la ventana */
+            height: 100vh; /* Ocupa todo el alto de la ventana */
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        .game-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5); /* Fondo semitransparente para ver el juego detrás */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 20;
+        }
+        .game-overlay h1 {
+            font-size: 64px;
+            margin-bottom: 10px;
+            color: #FFFFFF;
+            text-shadow: 3px 3px 8px rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        .title-with-paws::before,
+        .title-with-paws::after {
+            content: '🐾';
+            font-size: 48px;
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5));
+        }
+
+        .game-overlay p {
+            font-size: 22px;
+            max-width: 80%;
+            margin-bottom: 20px;
+            color: #ecf0f1;
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.7);
+        }
+        .game-overlay button {
+            padding: 15px 30px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #5D4037;
+            background: linear-gradient(to bottom, #FFD54F, #FFB300);
+            border: 1px solid #FFA000;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+         .game-overlay button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+        }
+         .game-overlay button:active {
+            transform: scale(0.98);
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="startScreen" class="game-overlay">
+        <h1 class="title-with-paws">PINCKY</h1>
+        <p>Ayuda a Pincky a recolectar sus huesitos 🦴</p>
+        <button id="startButton">🐾 Empezar a Jugar</button>
+    </div>
+
+    <div id="gameOverScreen" class="game-overlay" style="display: none;">
+        <h1 class="title-with-paws">Juego Terminado 😿</h1>
+        <p>Puntuación Final: <span id="finalScore">0</span></p>
+        <button id="restartButton">🐾 Jugar de Nuevo</button>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameContainer = document.querySelector('.game-container');
+
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const startButton = document.getElementById('startButton');
+        const restartButton = document.getElementById('restartButton');
+        const finalScoreSpan = document.getElementById('finalScore');
+        
+        // Variables del juego
+        let canvasWidth, canvasHeight, groundY;
+        let player, platforms, obstacles, coins, powerups, score, gameOver, gameSpeed, gameFrameCount;
+        let starsFar, starsMid, starsNear;
+        let backgroundGradient;
+
+        // Almacén de assets (imágenes)
+        const assets = {
+            player: [], coin: new Image(), ghostPowerup: new Image(),
+            destroyerPowerup: new Image(), magnetPowerup: new Image(),
+            ghostObstacle: new Image(), breakableObstacle: new Image()
+        };
+        let assetsLoaded = 0;
+        let totalAssets = 0;
+
+        // Constantes de física y jugabilidad
+        const playerWidth = 65;
+        const playerHeight = 98;
+        const playerDuckHeight = 49;
+        const jumpPower = 16;
+        const gravity = 0.8;
+        const powerupDuration = 480; // Duración en frames (aprox. 8 segundos a 60fps)
+
+        // Variables para control táctil
+        let isDragging = false;
+        let startY = 0;
+        let jumpTriggered = false;
+
+        function loadAssets() {
+            // CORRECCIÓN: Se eliminó el prefijo 'assets/' para solucionar los errores de carga.
+            // El juego ahora buscará las imágenes en la misma carpeta que el archivo index.html.
+            const assetSources = {
+                player1: 'p1.png', player2: 'p2.png', player3: 'p3.png',
+                coin: 'hueso.png', ghostPowerup: 'pipeta.png',
+                destroyerPowerup: 'vacuna.png', magnetPowerup: 'iman.png',
+                ghostObstacle: 'garrapata.png', breakableObstacle: 'virus.png'
+            };
+            totalAssets = Object.keys(assetSources).length;
+            
+            startButton.disabled = true;
+            startButton.textContent = "Cargando...";
+
+            function checkAllAssetsLoaded() {
+                if (assetsLoaded === totalAssets) {
+                    startButton.disabled = false;
+                    startButton.textContent = "🐾 Empezar a Jugar";
+                    console.log("Todos los assets cargados. ¡Listo para jugar!");
+                }
+            }
+
+            function onAssetLoad(assetName) {
+                console.log(`Asset cargado: ${assetName}`);
+                assetsLoaded++;
+                checkAllAssetsLoaded();
+            }
+
+            function onAssetError(assetName) {
+                console.error(`ERROR AL CARGAR: ${assetName}. Revisa la ruta, el nombre (mayúsculas/minúsculas) y que el archivo exista.`);
+                assetsLoaded++; // Se incrementa para no bloquear el juego, aunque la imagen no se verá.
+                checkAllAssetsLoaded();
+            }
+
+            for (const key in assetSources) {
+                const assetName = assetSources[key];
+                const img = new Image();
+                img.src = assetName;
+                img.onload = () => onAssetLoad(assetName);
+                img.onerror = () => onAssetError(assetName);
+
+                if (key.startsWith('player')) {
+                    const index = parseInt(key.replace('player', '')) - 1;
+                    assets.player[index] = img;
+                } else {
+                    assets[key] = img;
+                }
+            }
+        }
+
+        function resizeCanvas() {
+            canvas.width = gameContainer.clientWidth;
+            canvas.height = gameContainer.clientHeight;
+            canvasWidth = canvas.width;
+            canvasHeight = canvas.height;
+            groundY = canvasHeight - 40;
+        }
+
+        function init() {
+            resizeCanvas();
+            player = {
+                x: 40,
+                y: groundY - playerHeight, width: playerWidth, height: playerHeight,
+                velocityY: 0, grounded: true, isDucking: false, jumpsLeft: 2,
+                activePowerup: null, powerupTimer: 0
+            };
+            
+            platforms = [{ x: 0, y: groundY, width: canvasWidth, height: 40, isPopulated: true }];
+            while(platforms[platforms.length - 1].x + platforms[platforms.length - 1].width < canvasWidth * 2) {
+                generatePlatform(platforms.reduce((a, b) => (a.x + a.width > b.x + b.width) ? a : b));
+            }
+
+            obstacles = []; coins = []; powerups = [];
+            score = 0; gameOver = false; gameSpeed = 5; gameFrameCount = 0;
+
+            // Generación de estrellas para el fondo
+            starsFar = Array.from({ length: 100 }, () => ({ x: Math.random() * canvasWidth, y: Math.random() * canvasHeight, radius: Math.random() * 0.8 }));
+            starsMid = Array.from({ length: 50 }, () => ({ x: Math.random() * canvasWidth, y: Math.random() * canvasHeight, radius: Math.random() * 1.5 }));
+            starsNear = Array.from({ length: 25 }, () => ({ x: Math.random() * canvasWidth, y: Math.random() * canvasHeight, radius: Math.random() * 2.2 }));
+
+            gameOverScreen.style.display = 'none';
+            startScreen.style.display = 'flex';
+        }
+        
+        function generatePlatform(lastPlatform) {
+            const lastY = lastPlatform.y;
+            const lastXEnd = lastPlatform.x + lastPlatform.width;
+            
+            const levelHeights = [groundY, groundY - 130, groundY - 260, groundY - 390];
+            let possibleYLevels = [];
+
+            const lastLevelIndex = levelHeights.indexOf(lastY);
+            if (lastLevelIndex > 0) possibleYLevels.push(levelHeights[lastLevelIndex - 1]);
+            if (lastLevelIndex < levelHeights.length - 1) possibleYLevels.push(levelHeights[lastLevelIndex + 1]);
+            possibleYLevels.push(levelHeights[lastLevelIndex]);
+
+            const newY = possibleYLevels[Math.floor(Math.random() * possibleYLevels.length)];
+            const gap = (newY < lastY) ? Math.random() * 80 + 80 : Math.random() * 150 + 100;
+            const width = Math.random() * 400 + 400;
+            const newX = lastXEnd + gap;
+            platforms.push({ x: newX, y: newY, width: width, height: 20, isPopulated: false });
+        }
+
+        function populatePlatform(platform) {
+            platform.isPopulated = true;
+            const safeZone = 150;
+            const spawnableWidth = platform.width - (safeZone * 2);
+
+            if (spawnableWidth < 100) return;
+
+            const objectCount = Math.floor(Math.random() * 3) + 1;
+            let lastSpawnXOnPlatform = 0;
+
+            for (let i = 0; i < objectCount; i++) {
+                const spawnX = platform.x + safeZone + (Math.random() * spawnableWidth);
+
+                if (lastSpawnXOnPlatform > 0 && Math.abs(spawnX - lastSpawnXOnPlatform) < 150) continue;
+
+                const random = Math.random();
+                if (random < 0.15) { // 15% chance for a powerup
+                    const pTypes = ['ghost', 'destroyer', 'magnet'];
+                    powerups.push({ x: spawnX, y: platform.y - 45, radius: 28, type: pTypes[Math.floor(Math.random() * pTypes.length)] });
+                } else if (random < 0.55) { // 40% chance for an obstacle
+                    const oTypes = ['ghost', 'breakable'];
+                    const type = oTypes[Math.floor(Math.random() * oTypes.length)];
+                    const obstacleHeight = Math.random() * 50 + 45;
+                    obstacles.push({ x: spawnX, y: platform.y - obstacleHeight, width: 55, height: obstacleHeight, type: type });
+                } else { // 45% chance for a coin
+                    let coinY = platform.y - 35;
+                    if (Math.random() < 0.4) coinY = platform.y - 110; // Coin can be higher
+                    coins.push({ x: spawnX, y: coinY, radius: 22 });
+                }
+                lastSpawnXOnPlatform = spawnX;
+            }
+        }
+
+        function drawBackground() {
+            ctx.fillStyle = backgroundGradient;
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+            
+            ctx.fillStyle = 'rgba(236, 240, 241, 0.4)';
+            starsFar.forEach(star => { ctx.beginPath(); ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2); ctx.fill(); });
+            ctx.fillStyle = 'rgba(236, 240, 241, 0.7)';
+            starsMid.forEach(star => { ctx.beginPath(); ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2); ctx.fill(); });
+            ctx.fillStyle = 'rgba(236, 240, 241, 1.0)';
+            starsNear.forEach(star => { ctx.beginPath(); ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2); ctx.fill(); });
+        }
+
+        function drawPlayer() {
+            const frameIndex = Math.floor(gameFrameCount / 5) % assets.player.length;
+            const image = assets.player[frameIndex];
+            
+            ctx.save();
+            if (player.activePowerup === 'ghost') ctx.globalAlpha = 0.6;
+            
+            if (image && image.complete) {
+                ctx.drawImage(image, player.x, player.y, player.width, player.height);
+            } else { 
+                ctx.fillStyle = '#e74c3c'; 
+                ctx.fillRect(player.x, player.y, player.width, player.height); 
+            }
+            ctx.restore();
+        }
+        
+        function drawPlatforms() {
+            platforms.forEach(p => {
+                // OPTIMIZACIÓN: Solo dibuja plataformas que están dentro de la vista.
+                if (p.x + p.width < 0 || p.x > canvasWidth) return;
+
+                ctx.fillStyle = '#6D4C41'; // Color tierra
+                ctx.fillRect(p.x, p.y, p.width, p.height);
+                ctx.fillStyle = '#8BC34A'; // Color césped
+                ctx.fillRect(p.x, p.y, p.width, p.height / 2);
+            });
+        }
+
+        function drawObstacles() {
+            obstacles.forEach(o => {
+                // OPTIMIZACIÓN: Solo dibuja obstáculos que están dentro de la vista.
+                if (o.x + o.width < 0 || o.x > canvasWidth) return;
+                
+                ctx.save();
+                ctx.shadowColor = 'rgba(255, 0, 0, 0.7)';
+                ctx.shadowBlur = 15;
+
+                let imageToDraw, fallbackColor;
+                switch (o.type) {
+                    case 'ghost': imageToDraw = assets.ghostObstacle; fallbackColor = 'rgba(52, 152, 219, 0.5)'; break;
+                    case 'breakable': imageToDraw = assets.breakableObstacle; fallbackColor = '#d35400'; break;
+                }
+                if (imageToDraw && imageToDraw.complete) {
+                    ctx.drawImage(imageToDraw, o.x, o.y, o.width, o.height);
+                } else { 
+                    ctx.fillStyle = fallbackColor; 
+                    ctx.fillRect(o.x, o.y, o.width, o.height); 
+                }
+                ctx.restore();
+            });
+        }
+
+        function drawCoins() {
+            coins.forEach(coin => {
+                // OPTIMIZACIÓN: Solo dibuja monedas que están dentro de la vista.
+                if (coin.x + coin.radius < 0 || coin.x - coin.radius > canvasWidth) return;
+
+                if (assets.coin && assets.coin.complete) {
+                    ctx.drawImage(assets.coin, coin.x - coin.radius, coin.y - coin.radius, coin.radius * 2, coin.radius * 2);
+                } else {
+                    ctx.fillStyle = '#f1c40f';
+                    ctx.beginPath(); ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI * 2); ctx.fill();
+                }
+            });
+        }
+
+        function drawPowerups() {
+            powerups.forEach(p => {
+                // OPTIMIZACIÓN: Solo dibuja power-ups que están dentro de la vista.
+                if (p.x + p.radius < 0 || p.x - p.radius > canvasWidth) return;
+
+                ctx.save();
+                ctx.shadowColor = 'rgba(0, 255, 0, 0.7)';
+                ctx.shadowBlur = 20;
+
+                let imageToDraw, fallbackColor;
+                switch (p.type) {
+                    case 'ghost': imageToDraw = assets.ghostPowerup; fallbackColor = '#3498db'; break;
+                    case 'destroyer': imageToDraw = assets.destroyerPowerup; fallbackColor = '#e67e22'; break;
+                    case 'magnet': imageToDraw = assets.magnetPowerup; fallbackColor = '#2ecc71'; break;
+                }
+                if (imageToDraw && imageToDraw.complete) {
+                    ctx.drawImage(imageToDraw, p.x - p.radius, p.y - p.radius, p.radius * 2, p.radius * 2);
+                } else {
+                    ctx.fillStyle = fallbackColor;
+                    ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.restore();
+            });
+        }
+
+        function drawUI() {
+            ctx.save();
+            ctx.fillStyle = '#ecf0f1';
+            ctx.font = '24px Arial';
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            ctx.shadowBlur = 5;
+            ctx.fillText(`Puntuación: ${score}`, 20, 40);
+            ctx.restore();
+
+            if (player.activePowerup) {
+                const iconX = canvasWidth - 180;
+                const iconY = 20;
+                const iconSize = 40;
+                const barWidth = 120;
+                let powerupImage;
+
+                switch (player.activePowerup) {
+                    case 'ghost': powerupImage = assets.ghostPowerup; break;
+                    case 'destroyer': powerupImage = assets.destroyerPowerup; break;
+                    case 'magnet': powerupImage = assets.magnetPowerup; break;
+                }
+
+                if (powerupImage && powerupImage.complete) ctx.drawImage(powerupImage, iconX, iconY, iconSize, iconSize);
+                
+                ctx.fillStyle = '#bdc3c7';
+                ctx.fillRect(iconX + iconSize + 10, iconY + 5, barWidth, 30);
+                ctx.fillStyle = '#2ecc71';
+                ctx.fillRect(iconX + iconSize + 10, iconY + 5, (player.powerupTimer / powerupDuration) * barWidth, 30);
+            }
+        }
+
+        function updatePlayer() {
+            player.y += player.velocityY;
+            
+            let onPlatform = false;
+            for (const platform of platforms) {
+                if (player.x + player.width > platform.x && player.x < platform.x + platform.width &&
+                    player.y + player.height >= platform.y && player.y + player.height <= platform.y + 20 && // 20 es el alto de la plataforma
+                    player.velocityY >= 0) {
+                    if (!player.grounded) player.jumpsLeft = 2;
+                    player.grounded = true; onPlatform = true;
+                    player.velocityY = 0; player.y = platform.y - player.height;
+                    break;
+                }
+            }
+
+            if (!onPlatform) player.grounded = false;
+            if (!player.grounded) player.velocityY += gravity;
+            if (player.y > canvasHeight + 100) endGame(); // Da un margen antes de terminar
+
+            if (player.powerupTimer > 0) player.powerupTimer--;
+            else player.activePowerup = null;
+        }
+        
+        function updateBackgroundColor() {
+            const cycleDuration = 3000;
+            const progress = (gameFrameCount % cycleDuration) / cycleDuration;
+            
+            let colorTop, colorBottom;
+
+            if (progress < 0.5) { // Transición de día a noche
+                const p = progress / 0.5;
+                colorTop = interpolateColor("#2c3e50", "#1D2B38", p);
+                colorBottom = interpolateColor("#233140", "#141D26", p);
+            } else { // Transición de noche a día
+                const p = (progress - 0.5) / 0.5;
+                colorTop = interpolateColor("#1D2B38", "#2c3e50", p);
+                colorBottom = interpolateColor("#141D26", "#233140", p);
+            }
+
+            backgroundGradient = ctx.createLinearGradient(0, 0, 0, canvasHeight);
+            backgroundGradient.addColorStop(0, colorTop);
+            backgroundGradient.addColorStop(1, colorBottom);
+        }
+
+        function interpolateColor(color1, color2, factor) {
+            const r1 = parseInt(color1.substring(1, 3), 16), g1 = parseInt(color1.substring(3, 5), 16), b1 = parseInt(color1.substring(5, 7), 16);
+            const r2 = parseInt(color2.substring(1, 3), 16), g2 = parseInt(color2.substring(3, 5), 16), b2 = parseInt(color2.substring(5, 7), 16);
+            const r = Math.round(r1 + factor * (r2 - r1)), g = Math.round(g1 + factor * (g2 - g1)), b = Math.round(b1 + factor * (b2 - b1));
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        function updateWorld() {
+            updateBackgroundColor();
+
+            // Mover estrellas con efecto parallax
+            starsFar.forEach(star => { star.x -= gameSpeed * 0.2; if (star.x < 0) { star.x = canvasWidth; star.y = Math.random() * canvasHeight; } });
+            starsMid.forEach(star => { star.x -= gameSpeed * 0.4; if (star.x < 0) { star.x = canvasWidth; star.y = Math.random() * canvasHeight; } });
+            starsNear.forEach(star => { star.x -= gameSpeed * 0.6; if (star.x < 0) { star.x = canvasWidth; star.y = Math.random() * canvasHeight; } });
+
+            // Mover todos los objetos del mundo
+            platforms.forEach(p => p.x -= gameSpeed);
+            obstacles.forEach(o => o.x -= gameSpeed);
+            coins.forEach(c => c.x -= gameSpeed);
+            powerups.forEach(p => p.x -= gameSpeed);
+
+            // Lógica del imán
+            if (player.activePowerup === 'magnet') {
+                coins.forEach(coin => {
+                    const dist = Math.hypot(player.x - coin.x, player.y - coin.y);
+                    if (dist < 250) { 
+                        coin.x += (player.x - coin.x) * 0.1; 
+                        coin.y += (player.y - coin.y) * 0.1; 
+                    }
+                });
+            }
+
+            // Limpiar arrays de objetos que ya salieron de la pantalla
+            platforms = platforms.filter(p => p.x + p.width > 0);
+            obstacles = obstacles.filter(o => o.x + o.width > 0);
+            coins = coins.filter(c => c.x + c.radius > 0);
+            powerups = powerups.filter(p => p.x + p.radius > 0);
+
+            // Generar nuevas plataformas si es necesario
+            const lastPlatform = platforms[platforms.length - 1];
+            if (lastPlatform.x + lastPlatform.width < canvasWidth + 100) {
+                generatePlatform(lastPlatform);
+            }
+
+            // Poblar plataformas que entran en la vista
+            platforms.forEach(p => { if (!p.isPopulated && p.x < canvasWidth) populatePlatform(p); });
+            
+            // Aumentar la velocidad gradualmente
+            if (gameSpeed < 15) gameSpeed += 0.002;
+        }
+
+        function checkCollisions() {
+            // OPTIMIZACIÓN: Definir el hitbox del jugador una sola vez por frame.
+            const playerHitbox = { x: player.x + 15, y: player.y + 10, width: player.width - 30, height: player.height - 15 };
+
+            // Colisiones con obstáculos
+            obstacles.forEach((obstacle, index) => {
+                const obstacleHitbox = { x: obstacle.x + 5, y: obstacle.y + 5, width: obstacle.width - 10, height: obstacle.height - 10 };
+
+                if (playerHitbox.x < obstacleHitbox.x + obstacleHitbox.width && playerHitbox.x + playerHitbox.width > obstacleHitbox.x &&
+                    playerHitbox.y < obstacleHitbox.y + obstacleHitbox.height && playerHitbox.y + playerHitbox.height > obstacleHitbox.y) {
+                    
+                    if (obstacle.type === 'ghost' && player.activePowerup === 'ghost') {
+                        // Atraviesa el obstáculo fantasma
+                    } else if (obstacle.type === 'breakable' && player.activePowerup === 'destroyer') { 
+                        obstacles.splice(index, 1); 
+                        score += 50; 
+                    } else {
+                        endGame();
+                    }
+                }
+            });
+
+            // Colisiones con monedas
+            coins.forEach((coin, index) => {
+                 if (Math.hypot(player.x + player.width / 2 - coin.x, player.y + player.height / 2 - coin.y) < player.width / 2 + coin.radius) {
+                     score += 10; 
+                     coins.splice(index, 1);
+                 }
+            });
+
+            // Colisiones con power-ups
+            powerups.forEach((powerup, index) => {
+                if (Math.hypot(player.x + player.width / 2 - powerup.x, player.y + player.height / 2 - powerup.y) < player.width / 2 + powerup.radius) {
+                    player.activePowerup = powerup.type; 
+                    player.powerupTimer = powerupDuration; 
+                    powerups.splice(index, 1);
+                }
+            });
+        }
+        
+        function jump() {
+            if (player.jumpsLeft > 0 && !gameOver) { 
+                player.velocityY = -jumpPower; 
+                player.jumpsLeft--; 
+                player.grounded = false;
+            }
+        }
+
+        function startDuck() { if(player.grounded) player.isDucking = true; }
+        function endDuck() { player.isDucking = false; }
+        
+        function manageDuckingState() {
+            if (gameOver) return;
+            // Agacharse
+            if (player.grounded && player.isDucking && player.height === playerHeight) {
+                player.y += (playerHeight - playerDuckHeight);
+                player.height = playerDuckHeight;
+            } 
+            // Levantarse
+            else if (player.height === playerDuckHeight && !player.isDucking) {
+                player.y -= (playerHeight - playerDuckHeight);
+                player.height = playerHeight;
+            }
+        }
+
+        function gameLoop() {
+            if (gameOver) return;
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            
+            updateWorld();
+            manageDuckingState();
+            updatePlayer();
+            checkCollisions();
+
+            drawBackground();
+            drawPlatforms();
+            drawObstacles();
+            drawCoins();
+            drawPowerups();
+            drawPlayer();
+            drawUI();
+
+            gameFrameCount++;
+            requestAnimationFrame(gameLoop);
+        }
+
+        function startGame() { 
+            init(); 
+            gameOver = false; 
+            startScreen.style.display = 'none'; 
+            gameOverScreen.style.display = 'none'; 
+            gameLoop(); 
+        }
+        function endGame() { 
+            gameOver = true; 
+            finalScoreSpan.textContent = score; 
+            gameOverScreen.style.display = 'flex'; 
+        }
+
+        // --- MANEJADORES DE EVENTOS (CONTROLES) ---
+        function handleDragStart(e) {
+            e.preventDefault();
+            isDragging = true;
+            startY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+            jumpTriggered = false;
+        }
+        function handleDrag(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            const currentY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+            const deltaY = currentY - startY;
+            
+            if (deltaY < -30 && !jumpTriggered) { // Deslizar hacia arriba para saltar
+                jump(); 
+                jumpTriggered = true; // Evita saltos múltiples con un solo deslizamiento
+            } 
+            else if (deltaY > 30) { // Deslizar hacia abajo para agacharse
+                startDuck(); 
+            }
+        }
+        function handleDragEnd() {
+            if (!isDragging) return;
+            isDragging = false;
+            endDuck(); 
+        }
+
+        // Eventos para ratón
+        canvas.addEventListener('mousedown', handleDragStart);
+        canvas.addEventListener('mousemove', handleDrag);
+        canvas.addEventListener('mouseup', handleDragEnd);
+        canvas.addEventListener('mouseleave', handleDragEnd);
+        // Eventos para pantalla táctil
+        canvas.addEventListener('touchstart', handleDragStart, { passive: false });
+        canvas.addEventListener('touchmove', handleDrag, { passive: false });
+        canvas.addEventListener('touchend', handleDragEnd);
+
+        // Eventos de teclado
+        window.addEventListener('keydown', (e) => { 
+            if (e.code === 'ArrowUp' || e.code === 'Space') jump(); 
+            else if (e.code === 'ArrowDown') startDuck(); 
+        });
+        window.addEventListener('keyup', (e) => { 
+            if (e.code === 'ArrowDown') endDuck(); 
+        });
+        
+        // Eventos de la UI
+        window.addEventListener('resize', () => !gameOver && resizeCanvas());
+        startButton.addEventListener('click', startGame);
+        restartButton.addEventListener('click', startGame);
+
+        // Iniciar la carga de assets al cargar la página
+        loadAssets();
+    });
+</script>
+
+</body>
+</html>
