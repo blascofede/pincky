@@ -460,13 +460,19 @@
             const frameIndex = Math.floor(gameFrameCount / 5) % assets.player.length;
             const image = assets.player[frameIndex];
             
-            ctx.save();
-            // Se quitó la comprobación de powerup 'ghost' para la transparencia
+            ctx.save(); // Salvar el estado del contexto
+
+            // NUEVA LÓGICA: Resplandor verde si tiene el power-up 'destroyer'
+            if (player.activePowerup === 'destroyer') {
+                ctx.shadowColor = 'rgba(0, 255, 100, 0.9)'; // Un verde brillante
+                ctx.shadowBlur = 25; // Tamaño del resplandor
+            }
             
             if (image && image.complete) {
                 ctx.drawImage(image, player.x, player.y, player.width, player.height);
             }
-            ctx.restore();
+            
+            ctx.restore(); // Restaurar el contexto (esto elimina el shadowBlur para otros dibujos)
         }
         
         function drawPlatforms() {
@@ -517,20 +523,20 @@
         function drawUI() {
             ctx.save();
             ctx.fillStyle = '#ecf0f1';
-            // AJUSTE: Fuente más grande, en negrita y reubicada
-            ctx.font = `bold ${s(48)}px Arial`; // AJUSTE: Más grande
+            // AJUSTE: Fuente más grande
+            ctx.font = `bold ${s(55)}px Arial`; // AJUSTE: Más grande (antes 48)
             ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
             ctx.shadowBlur = 5;
-            ctx.fillText(`Huesos: ${score}`, s(25), s(55)); // AJUSTE: Texto y posición
+            ctx.fillText(`Huesos: ${score}`, s(30), s(60)); // AJUSTE: Posición
             ctx.restore();
 
             if (player.activePowerup) {
                 // AJUSTE: Icono y barra de power-up más grandes
-                const iconSize = s(65); // AJUSTE: Más grande
-                const barWidth = s(180); // AJUSTE: Más grande
-                const barHeight = s(45); // AJUSTE: Más grande
-                const iconX = canvasWidth - barWidth - iconSize - s(40); // AJUSTE: Más padding
-                const iconY = s(20); // AJUSTE: Reubicado
+                const iconSize = s(75); // AJUSTE: Más grande (antes 65)
+                const barWidth = s(200); // AJUSTE: Más grande (antes 180)
+                const barHeight = s(50); // AJUSTE: Más grande (antes 45)
+                const iconX = canvasWidth - barWidth - iconSize - s(45); // AJUSTE: Más padding
+                const iconY = s(25); // AJUSTE: Reubicado
                 let powerupImage;
 
                 switch (player.activePowerup) {
@@ -543,9 +549,9 @@
                 if (powerupImage && powerupImage.complete) ctx.drawImage(powerupImage, iconX, iconY, iconSize, iconSize);
                 
                 ctx.fillStyle = '#bdc3c7';
-                ctx.fillRect(iconX + iconSize + s(10), iconY + s(10), barWidth, barHeight); // AJUSTE: Alineación Y
+                ctx.fillRect(iconX + iconSize + s(10), iconY + s(12.5), barWidth, barHeight); // AJUSTE: Alineación Y
                 ctx.fillStyle = '#2ecc71';
-                ctx.fillRect(iconX + iconSize + s(10), iconY + s(10), (player.powerupTimer / powerupDuration) * barWidth, barHeight); // AJUSTE: Alineación Y
+                ctx.fillRect(iconX + iconSize + s(10), iconY + s(12.5), (player.powerupTimer / powerupDuration) * barWidth, barHeight); // AJUSTE: Alineación Y
             }
         }
 
