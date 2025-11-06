@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <!-- META TAG MEJORADO: Asegura que la página ocupe toda la pantalla y no permita el zoom del usuario, ideal para juegos. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PINCKY - Optimizado y Responsivo</title>
+    <style>
+        /* Estilos generales para que el juego ocupe toda la ventana */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* Evita barras de scroll no deseadas */
+            background-color: #2c3e50;
+            font-family: 'Arial', sans-serif;
+        }
+        .game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+            /* MEJORA VISUAL: Evita que el pixel art se vea borroso al escalar. */
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-crisp-edges;
+        }
+        /* Contenedor para los menús de inicio y fin de juego */
+        .game-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 20;
+            color: #ecf0f1;
+        }
+        /* MEJORA RESPONSIVE: Títulos con tamaño de fuente adaptable usando clamp() */
+        .game-overlay h1 {
+            /* clamp(min, preferred, max) */
+            font-size: clamp(2.5rem, 8vw, 6rem);
+            margin-bottom: 10px;
+            color: #FFFFFF;
+            text-shadow: 3px 3px 8px rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        /* Íconos de huellas para el título (CORREGIDO) */
+        .title-with-paws::before,
+        .title-with-paws::after {
+            content: '🐾'; /* CORRECCIÓN: Se arregló el emoji roto */
+            font-size: clamp(2rem, 6vw, 4.5rem);
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5));
+        }
+        /* MEJORA RESPONSIVE: Párrafos con tamaño de fuente adaptable */
+        .game-overlay p {
+            font-size: clamp(1rem, 3vw, 1.5rem);
+            max-width: 80%;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.7);
+        }
+        /* MEJORA RESPONSIVE: Botones con tamaño y padding adaptables */
+        .game-overlay button {
+            padding: clamp(12px, 3vw, 20px) clamp(24px, 5vw, 40px);
+            font-size: clamp(1rem, 2.5vw, 1.4rem);
+            font-weight: bold;
+            color: #5D4037;
+            background: linear-gradient(to bottom, #FFD54F, #FFB300);
+            border: 1px solid #FFA000;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        .game-overlay button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+        }
+        .game-overlay button:active {
+            transform: scale(0.98);
+        }
+
+        /* --- ESTILOS DEL TUTORIAL --- */
+        .tutorial-content {
+            display: grid;
+            grid-template-columns: 1fr; /* Una columna por defecto para móviles */
+            gap: 15px;
+            max-width: 90%;
+            width: 800px;
+            margin-bottom: 25px;
+            background: rgba(44, 62, 80, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        /* En pantallas más anchas, usar 2 columnas */
+        @media (min-width: 768px) {
+            .tutorial-content {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .tutorial-item {
+            display: flex;
+            align-items: center;
+            text-align: left;
+            gap: 15px;
+        }
+
+        .tutorial-icon {
+            width: 50px;
+            height: 50px;
+            object-fit: contain;
+            flex-shrink: 0;
+            filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.5));
+        }
+        
+        .tutorial-icon-text {
+            font-size: 50px;
+            flex-shrink: 0;
+            width: 50px;
+            text-align: center;
+            filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.5));
+        }
+
+        .tutorial-item p {
+            font-size: clamp(0.9rem, 2.2vw, 1.2rem);
+            margin: 0;
+            text-shadow: none;
+        }
+        /* --- FIN ESTILOS DEL TUTORIAL --- */
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="startScreen" class="game-overlay">
+        <h1 class="title-with-paws">PINCKY</h1>
+        <p>Ayuda a Pincky a recolectar sus huesitos 🦴</p>
+        <button id="startButton">🐾 Empezar a Jugar</button>
+        <!-- BOTÓN DE ROTACIÓN AÑADIDO -->
+        <button id="rotateButton" style="margin-top: 20px; background: #3a86ff; color: white; border-color: #0055d4; display: none; padding: clamp(10px, 2.5vw, 18px) clamp(20px, 4vw, 36px); font-size: clamp(0.9rem, 2.2vw, 1.3rem); font-weight: bold; border-radius: 10px; cursor: pointer;">
+            Girar Pantalla 🔄
+        </button>
+    </div>
+
+    <!-- --- PANTALLA DE TUTORIAL AÑADIDA --- -->
+    <div id="tutorialScreen" class="game-overlay" style="display: none;">
+        <h1 style="font-size: clamp(2.2rem, 7vw, 5.5rem); margin-bottom: 20px;">¡Cómo Jugar!</h1>
+        <div class="tutorial-content">
+            <div class="tutorial-item">
+                <!-- Usar <img> en lugar de emojis para asegurar la carga -->
+                <img src="assets/hueso.png" alt="Hueso" class="tutorial-icon">
+                <p><strong>Objetivo:</strong> ¡Recolecta todos los huesitos 🦴 que puedas!</p>
+            </div>
+            <div class="tutorial-item">
+                <span class="tutorial-icon-text">⬆️</span>
+                <p><strong>Saltar:</strong> Desliza hacia arriba o presiona [Espacio] para saltar. ¡Puedes saltar dos veces!</p>
+            </div>
+            <div class="tutorial-item">
+                 <span class="tutorial-icon-text">⬇️</span>
+                <p><strong>Agacharse:</strong> Desliza hacia abajo o presiona [Flecha Abajo] para esquivar.</p>
+            </div>
+            <div class="tutorial-item">
+                <img src="assets/virus.png" alt="Virus" class="tutorial-icon">
+                <p><strong>Evita los Virus:</strong> ¡No dejes que te toquen 🦠!</p>
+            </div>
+            <div class="tutorial-item">
+                <img src="assets/vacuna.png" alt="Vacuna" class="tutorial-icon">
+                <p><strong>Vacuna:</strong> Te permite destruir un virus 💉 al chocar con él.</p>
+            </div>
+            <div class="tutorial-item">
+                <img src="assets/iman.png" alt="Imán" class="tutorial-icon">
+                <p><strong>Imán:</strong> Atrae todos los huesitos 🧲 cercanos.</p>
+            </div>
+        </div>
+        <button id="tutorialStartButton">🐾 ¡A Jugar!</button>
+    </div>
+    <!-- --- FIN PANTALLA DE TUTORIAL --- -->
+
+
+    <div id="gameOverScreen" class="game-overlay" style="display: none;">
+        <h1 class="title-with-paws">Juego Terminado 😿</h1>
+        <p>Puntuación Final: <span id="finalScore">0</span></p>
+        <button id="restartButton">🐾 Jugar de Nuevo</button>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const tutorialScreen = document.getElementById('tutorialScreen'); // Tutorial screen
+        
+        const startButton = document.getElementById('startButton');
+        const restartButton = document.getElementById('restartButton');
+        const tutorialStartButton = document.getElementById('tutorialStartButton'); // Tutorial button
+        const finalScoreSpan = document.getElementById('finalScore');
+        const rotateButton = document.getElementById('rotateButton'); // Botón de rotación
+        
+        // --- MEJORA RESPONSIVE: Lógica de Escalado ---
+        // Se define una altura base para el diseño del juego.
+        // Todos los tamaños y velocidades se calcularán en relación a esta altura.
+        const BASE_HEIGHT = 900; 
+        let scale = 1;
+
+        // Función de ayuda para escalar valores.
+        function s(value) {
+            return value * scale;
+        }
+
+        // Variables del juego
+        let canvasWidth, canvasHeight, groundY;
+        let player, platforms, obstacles, coins, powerups, score, gameOver, gameSpeed, gameFrameCount;
+        let starsFar, starsMid, starsNear;
+        let backgroundGradient;
+
+        // Almacén de assets (imágenes) - Se quitaron ghostObstacle y ghostPowerup
+        const assets = {
+            player: [], coin: new Image(),
+            destroyerPowerup: new Image(), magnetPowerup: new Image(),
+            breakableObstacle: new Image()
+        };
+        let assetsLoaded = 0;
+        let totalAssets = 0;
+
+        // Variables de físicas y jugabilidad (ahora se inicializan vacías y se calculan después)
+        let playerWidth, playerHeight, playerDuckHeight, jumpPower, gravity, powerupDuration;
+
+        // Variables para control táctil
+        let isDragging = false;
+        let startY = 0;
+        let jumpTriggered = false;
+
+        function loadAssets() {
+            // CORRECCIÓN: Se añade la ruta 'assets/' para que coincida con la estructura de carpetas y solucionar los errores de carga.
+            // Se quitaron ghostPowerup y ghostObstacle de las fuentes
+            const assetSources = {
+                player1: 'assets/p1.png', player2: 'assets/p2.png', player3: 'assets/p3.png',
+                coin: 'assets/hueso.png',
+                destroyerPowerup: 'assets/vacuna.png', magnetPowerup: 'assets/iman.png',
+                breakableObstacle: 'assets/virus.png'
+            };
+            totalAssets = Object.keys(assetSources).length;
+            
+            startButton.disabled = true;
+            startButton.textContent = `Cargando 0/${totalAssets}...`;
+
+            // Ocultar botones que dependen de assets
+            const tutorialIcons = document.querySelectorAll('.tutorial-icon');
+            tutorialIcons.forEach(icon => icon.style.visibility = 'hidden');
+
+
+            function checkAllAssetsLoaded() {
+                if (assetsLoaded === totalAssets) {
+                    startButton.disabled = false;
+                    startButton.textContent = "🐾 Empezar a Jugar";
+                    console.log("Todos los assets cargados. ¡Listo para jugar!");
+                    // Mostrar iconos del tutorial una vez cargados
+                    tutorialIcons.forEach(icon => icon.style.visibility = 'visible');
+                }
+            }
+
+            function onAssetLoad(assetName) {
+                assetsLoaded++;
+                startButton.textContent = `Cargando ${assetsLoaded}/${totalAssets}...`;
+                checkAllAssetsLoaded();
+            }
+
+            function onAssetError(assetName) {
+                assetsLoaded++;
+                startButton.textContent = `Cargando ${assetsLoaded}/${totalAssets}...`;
+                console.error(`ERROR AL CARGAR: ${assetName}. Revisa la ruta y el nombre.`);
+                checkAllAssetsLoaded();
+            }
+
+            for (const key in assetSources) {
+                const assetName = assetSources[key];
+                const img = new Image();
+                img.src = assetName;
+                img.onload = () => onAssetLoad(assetName);
+                img.onerror = () => onAssetError(assetName);
+
+                if (key.startsWith('player')) {
+                    const index = parseInt(key.replace('player', '')) - 1;
+                    assets.player[index] = img;
+                } else {
+                    assets[key] = img;
+                }
+            }
+        }
+
+        // MEJORA RESPONSIVE: Esta función se encarga de ajustar el canvas y calcular el factor de escala.
+        function resizeAndScale() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            canvasWidth = canvas.width;
+            canvasHeight = canvas.height;
+
+            // El factor de escala se basa en la altura actual vs la altura de diseño.
+            scale = canvasHeight / BASE_HEIGHT;
+            
+            // Recalcula todas las constantes del juego basadas en el nuevo factor de escala.
+            playerWidth = s(75);
+            playerHeight = s(110);
+            playerDuckHeight = s(55);
+            jumpPower = s(22);
+            gravity = s(1);
+            powerupDuration = 480; // Duración en frames (aprox. 8 segundos a 60fps)
+            groundY = canvasHeight - s(60);
+        }
+        
+        function init() {
+            // Llama a la función de escalado al iniciar el juego.
+            resizeAndScale();
+
+            player = {
+                x: s(60),
+                y: groundY - playerHeight, width: playerWidth, height: playerHeight,
+                velocityY: 0, grounded: true, isDucking: false, jumpsLeft: 2,
+                activePowerup: null, powerupTimer: 0
+            };
+            
+            platforms = [{ x: 0, y: groundY, width: canvasWidth, height: s(60), isPopulated: true }];
+            while(platforms[platforms.length - 1].x + platforms[platforms.length - 1].width < canvasWidth * 2) {
+                generatePlatform(platforms.reduce((a, b) => (a.x + a.width > b.x + b.width) ? a : b));
+            }
+
+            obstacles = []; coins = []; powerups = [];
+            score = 0; gameOver = false; gameSpeed = s(6); gameFrameCount = 0;
+
+            starsFar = Array.from({ length: 100 }, () => ({ x: Math.random() * canvasWidth, y: Math.random() * canvasHeight, radius: Math.random() * s(1) }));
+            starsMid = Array.from({ length: 50 }, () => ({ x: Math.random() * canvasWidth, y: Math.random() * canvasHeight, radius: Math.random() * s(1.8) }));
+            starsNear = Array.from({ length: 25 }, () => ({ x: Math.random() * canvasWidth, y: Math.random() * canvasHeight, radius: Math.random() * s(2.5) }));
+
+            gameOverScreen.style.display = 'none';
+            tutorialScreen.style.display = 'none';
+            startScreen.style.display = 'flex';
+        }
+        
+        function generatePlatform(lastPlatform) {
+            const lastY = lastPlatform.y;
+            const lastXEnd = lastPlatform.x + lastPlatform.width;
+            
+            // Las alturas de las plataformas ahora son relativas
+            const levelHeights = [groundY, groundY - s(150), groundY - s(300), groundY - s(450)];
+            let possibleYLevels = [];
+
+            const lastLevelIndex = levelHeights.indexOf(lastY);
+            if (lastLevelIndex > 0) possibleYLevels.push(levelHeights[lastLevelIndex - 1]);
+            if (lastLevelIndex < levelHeights.length - 1) possibleYLevels.push(levelHeights[lastLevelIndex + 1]);
+            possibleYLevels.push(levelHeights[lastLevelIndex]);
+
+            const newY = possibleYLevels[Math.floor(Math.random() * possibleYLevels.length)];
+            const gap = (newY < lastY) ? Math.random() * s(80) + s(80) : Math.random() * s(150) + s(100);
+            const width = Math.random() * s(400) + s(400);
+            const newX = lastXEnd + gap;
+            platforms.push({ x: newX, y: newY, width: width, height: s(30), isPopulated: false });
+        }
+
+        function populatePlatform(platform) {
+            platform.isPopulated = true;
+            const safeZone = s(150);
+            const spawnableWidth = platform.width - (safeZone * 2);
+
+            if (spawnableWidth < s(100)) return;
+
+            const objectCount = Math.floor(Math.random() * 3) + 1;
+            let lastSpawnXOnPlatform = 0;
+
+            for (let i = 0; i < objectCount; i++) {
+                const spawnX = platform.x + safeZone + (Math.random() * spawnableWidth);
+
+                if (lastSpawnXOnPlatform > 0 && Math.abs(spawnX - lastSpawnXOnPlatform) < s(150)) continue;
+
+                const random = Math.random();
+                if (random < 0.15) { // Powerup
+                    const pTypes = ['destroyer', 'magnet']; // Se quitó 'ghost'
+                    powerups.push({ x: spawnX, y: platform.y - s(45), radius: s(28), type: pTypes[Math.floor(Math.random() * pTypes.length)] });
+                } else if (random < 0.55) { // Obstaculo
+                    const oTypes = ['breakable']; // Se quitó 'ghost'
+                    const type = oTypes[Math.floor(Math.random() * oTypes.length)];
+                    const obstacleHeight = Math.random() * s(50) + s(45);
+                    obstacles.push({ x: spawnX, y: platform.y - obstacleHeight, width: s(55), height: obstacleHeight, type: type });
+                } else { // Moneda (hueso)
+                    let coinY = platform.y - s(35);
+                    if (Math.random() < 0.4) coinY = platform.y - s(110);
+                    coins.push({ x: spawnX, y: coinY, radius: s(22) });
+                }
+                lastSpawnXOnPlatform = spawnX;
+            }
+        }
+        
+        function updateBackgroundColor() {
+            const cycleDuration = 3000;
+            const progress = (gameFrameCount % cycleDuration) / cycleDuration;
+            let colorTop, colorBottom;
+
+            if (progress < 0.5) { // Día a Noche
+                colorTop = `rgb(${Math.round(44 - 15 * (progress/0.5))}, ${Math.round(62 - 21 * (progress/0.5))}, ${Math.round(80 - 24 * (progress/0.5))})`;
+                colorBottom = `rgb(${Math.round(35 - 15 * (progress/0.5))}, ${Math.round(49 - 21 * (progress/0.5))}, ${Math.round(64 - 24 * (progress/0.5))})`;
+            } else { // Noche a Día
+                colorTop = `rgb(${Math.round(29 + 15 * ((progress-0.5)/0.5))}, ${Math.round(41 + 21 * ((progress-0.5)/0.5))}, ${Math.round(56 + 24 * ((progress-0.5)/0.5))})`;
+                colorBottom = `rgb(${Math.round(20 + 15 * ((progress-0.5)/0.5))}, ${Math.round(28 + 21 * ((progress-0.5)/0.5))}, ${Math.round(40 + 24 * ((progress-0.5)/0.5))})`;
+            }
+
+            backgroundGradient = ctx.createLinearGradient(0, 0, 0, canvasHeight);
+            backgroundGradient.addColorStop(0, colorTop);
+            backgroundGradient.addColorStop(1, colorBottom);
+        }
+
+        function drawBackground() {
+            ctx.fillStyle = backgroundGradient;
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+            
+            ctx.fillStyle = 'rgba(236, 240, 241, 0.4)';
+            starsFar.forEach(star => { ctx.beginPath(); ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2); ctx.fill(); });
+            ctx.fillStyle = 'rgba(236, 240, 241, 0.7)';
+            starsMid.forEach(star => { ctx.beginPath(); ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2); ctx.fill(); });
+            ctx.fillStyle = 'rgba(236, 240, 241, 1.0)';
+            starsNear.forEach(star => { ctx.beginPath(); ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2); ctx.fill(); });
+        }
+
+        function drawPlayer() {
+            const frameIndex = Math.floor(gameFrameCount / 5) % assets.player.length;
+            const image = assets.player[frameIndex];
+            
+            ctx.save();
+            // Se quitó la comprobación de powerup 'ghost' para la transparencia
+            
+            if (image && image.complete) {
+                ctx.drawImage(image, player.x, player.y, player.width, player.height);
+            }
+            ctx.restore();
+        }
+        
+        function drawPlatforms() {
+            platforms.forEach(p => {
+                if (p.x + p.width < 0 || p.x > canvasWidth) return;
+                ctx.fillStyle = '#6D4C41';
+                ctx.fillRect(p.x, p.y, p.width, p.height);
+                ctx.fillStyle = '#8BC34A';
+                ctx.fillRect(p.x, p.y, p.width, p.height / 2);
+            });
+        }
+
+        function drawObjects(objects, defaultDraw) {
+            objects.forEach(obj => {
+                if (obj.x + (obj.width || obj.radius) < 0 || obj.x - (obj.radius || 0) > canvasWidth) return;
+                
+                let imageToDraw, shadowColor, fallbackColor;
+                
+                if (obj.type) { // Obstáculos y Powerups
+                    ctx.save();
+                    switch (obj.type) {
+                        // Se quitó el case 'ghost'
+                        case 'breakable': imageToDraw = assets.breakableObstacle; shadowColor = 'rgba(255, 0, 0, 0.7)'; fallbackColor = '#d35400'; break;
+                        // Se quitó el case 'ghost_powerup'
+                        case 'destroyer_powerup': imageToDraw = assets.destroyerPowerup; shadowColor = 'rgba(0, 255, 0, 0.7)'; fallbackColor = '#e67e22'; break;
+                        case 'magnet_powerup': imageToDraw = assets.magnetPowerup; shadowColor = 'rgba(0, 255, 0, 0.7)'; fallbackColor = '#2ecc71'; break;
+                    }
+                    ctx.shadowColor = shadowColor;
+                    ctx.shadowBlur = 15;
+                } else { // Monedas
+                    imageToDraw = assets.coin;
+                    fallbackColor = '#f1c40f';
+                }
+
+                if (imageToDraw && imageToDraw.complete) {
+                    const w = obj.width || obj.radius * 2;
+                    const h = obj.height || obj.radius * 2;
+                    const drawX = obj.x - (obj.radius || 0);
+                    const drawY = obj.y - (obj.radius || 0);
+                    ctx.drawImage(imageToDraw, drawX, drawY, w, h);
+                } else if (fallbackColor) {
+                    defaultDraw(obj, fallbackColor);
+                }
+                if(obj.type) ctx.restore();
+            });
+        }
+
+        function drawUI() {
+            ctx.save();
+            ctx.fillStyle = '#ecf0f1';
+            ctx.font = `${s(30)}px Arial`;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            ctx.shadowBlur = 5;
+            ctx.fillText(`Puntuación: ${score}`, s(20), s(40));
+            ctx.restore();
+
+            if (player.activePowerup) {
+                const iconSize = s(45);
+                const barWidth = s(120);
+                const barHeight = s(30);
+                const iconX = canvasWidth - barWidth - iconSize - s(30);
+                const iconY = s(20);
+                let powerupImage;
+
+                switch (player.activePowerup) {
+                    // Se quitó el case 'ghost'
+                    case 'destroyer': powerupImage = assets.destroyerPowerup; break;
+                    // CORRECCIÓN: Se cambió 'assets.magnetup' por 'assets.magnetPowerup'
+                    case 'magnet': powerupImage = assets.magnetPowerup; break; 
+                }
+
+                if (powerupImage && powerupImage.complete) ctx.drawImage(powerupImage, iconX, iconY, iconSize, iconSize);
+                
+                ctx.fillStyle = '#bdc3c7';
+                ctx.fillRect(iconX + iconSize + s(10), iconY + s(5), barWidth, barHeight);
+                ctx.fillStyle = '#2ecc71';
+                ctx.fillRect(iconX + iconSize + s(10), iconY + s(5), (player.powerupTimer / powerupDuration) * barWidth, barHeight);
+            }
+        }
+
+        function updatePlayer() {
+            player.y += player.velocityY;
+            
+            let onPlatform = false;
+            for (const platform of platforms) {
+                // Comprobación horizontal
+                const isHorizontallyAligned = player.x + player.width > platform.x && player.x < platform.x + platform.width;
+                
+                // Posición inferior en el fotograma anterior (antes de aplicar la velocidad de este fotograma)
+                const previousBottom = (player.y - player.velocityY) + player.height;
+                
+                // Posición inferior en el fotograma actual
+                const currentBottom = player.y + player.height;
+
+                // Comprobación vertical (colisión robusta contra "tunneling")
+                // 1. ¿Está alineado horizontalmente?
+                // 2. ¿Se está moviendo hacia abajo? (o está quieto)
+                // 3. ¿Estaba su parte inferior ARRIBA de la plataforma en el fotograma anterior?
+                // 4. ¿Está su parte inferior AHORA DEBAJO (o sobre) la plataforma?
+                if (isHorizontallyAligned && 
+                    player.velocityY >= 0 && 
+                    previousBottom <= platform.y &&
+                    currentBottom >= platform.y) 
+                {
+                    // ¡Colisión! El jugador ha aterrizado.
+                    if (!player.grounded) player.jumpsLeft = 2;
+                    player.grounded = true; 
+                    onPlatform = true;
+                    player.velocityY = 0; 
+                    player.y = platform.y - player.height; // Forzar la posición a estar sobre la plataforma
+                    break;
+                }
+            }
+
+            if (!onPlatform) player.grounded = false;
+            if (!player.grounded) player.velocityY += gravity;
+            if (player.y > canvasHeight + s(100)) endGame();
+
+            if (player.powerupTimer > 0) player.powerupTimer--;
+            else player.activePowerup = null;
+        }
+
+        function updateWorld() {
+            updateBackgroundColor();
+
+            starsFar.forEach(star => { star.x -= gameSpeed * 0.2; if (star.x < 0) { star.x = canvasWidth; star.y = Math.random() * canvasHeight; } });
+            starsMid.forEach(star => { star.x -= gameSpeed * 0.4; if (star.x < 0) { star.x = canvasWidth; star.y = Math.random() * canvasHeight; } });
+            starsNear.forEach(star => { star.x -= gameSpeed * 0.6; if (star.x < 0) { star.x = canvasWidth; star.y = Math.random() * canvasHeight; } });
+
+            [platforms, obstacles, coins, powerups].forEach(arr => arr.forEach(obj => obj.x -= gameSpeed));
+
+            if (player.activePowerup === 'magnet') {
+                coins.forEach(coin => {
+                    const dist = Math.hypot(player.x - coin.x, player.y - coin.y);
+                    if (dist < s(250)) { 
+                        coin.x += (player.x - coin.x) * 0.1; 
+                        coin.y += (player.y - coin.y) * 0.1; 
+                    }
+                });
+            }
+
+            platforms = platforms.filter(p => p.x + p.width > 0);
+            obstacles = obstacles.filter(o => o.x + o.width > 0);
+            coins = coins.filter(c => c.x + c.radius > 0);
+            powerups = powerups.filter(p => p.x + p.radius > 0);
+
+            const lastPlatform = platforms[platforms.length - 1];
+            if (lastPlatform.x + lastPlatform.width < canvasWidth + s(100)) {
+                generatePlatform(lastPlatform);
+            }
+
+            platforms.forEach(p => { if (!p.isPopulated && p.x < canvasWidth) populatePlatform(p); });
+            
+            if (gameSpeed < s(18)) gameSpeed += s(0.002);
+        }
+
+        function checkCollisions() {
+            // CORRECCIÓN: Se arregló el error de tipeo (era 1MAR)
+            const playerHitbox = { x: player.x + s(15), y: player.y + s(10), width: player.width - s(30), height: player.height - s(15) };
+
+            obstacles.forEach((obstacle, index) => {
+                const obstacleHitbox = { x: obstacle.x, y: obstacle.y, width: obstacle.width, height: obstacle.height };
+                if (playerHitbox.x < obstacleHitbox.x + obstacleHitbox.width && playerHitbox.x + playerHitbox.width > obstacleHitbox.x &&
+                    playerHitbox.y < obstacleHitbox.y + obstacleHitbox.height && playerHitbox.y + playerHitbox.height > obstacleHitbox.y) {
+                    
+                    // Lógica simplificada: ya no se comprueba el obstáculo 'ghost' ni el powerup 'ghost'
+                    if (obstacle.type === 'breakable' && player.activePowerup === 'destroyer') { 
+                        obstacles.splice(index, 1); 
+                        score += 50; 
+                    } else {
+                        endGame();
+                    }
+                }
+            });
+
+            coins.forEach((coin, index) => {
+                 // CORRECCIÓN: Se restauró el contenido faltante del bucle
+                 if (Math.hypot(player.x + player.width / 2 - coin.x, player.y + player.height / 2 - coin.y) < player.width / 2 + coin.radius) {
+                     score += 10; 
+                     coins.splice(index, 1);
+                 }
+            });
+
+            // CORRECCIÓN: Se restauró el código faltante
+            powerups.forEach((powerup, index) => {
+                if (Math.hypot(player.x + player.width / 2 - powerup.x, player.y + player.height / 2 - powerup.y) < player.width / 2 + powerup.radius) {
+                    player.activePowerup = powerup.type; 
+                    player.powerupTimer = powerupDuration; 
+                    powerups.splice(index, 1);
+                }
+            });
+        }
+        
+        function jump() {
+            if (player.jumpsLeft > 0 && !gameOver) { 
+                player.velocityY = -jumpPower; 
+                player.jumpsLeft--; 
+                player.grounded = false;
+            }
+        }
+
+        function startDuck() { if(player.grounded) player.isDucking = true; }
+        function endDuck() { player.isDucking = false; }
+        
+        function manageDuckingState() {
+            if (gameOver) return;
+            if (player.grounded && player.isDucking && player.height === playerHeight) {
+                player.y += (playerHeight - playerDuckHeight);
+                player.height = playerDuckHeight;
+            } 
+            else if (player.height === playerDuckHeight && !player.isDucking) {
+                player.y -= (playerHeight - playerDuckHeight);
+                player.height = playerHeight;
+            }
+        }
+
+        function gameLoop() {
+            if (gameOver) return;
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            
+            updateWorld();
+            manageDuckingState();
+            updatePlayer();
+            checkCollisions();
+
+            drawBackground();
+            drawPlatforms();
+            // Reutilizando la lógica de dibujado
+            drawObjects(obstacles, (obj, color) => { ctx.fillStyle = color; ctx.fillRect(obj.x, obj.y, obj.width, obj.height); });
+            drawObjects(coins, (obj, color) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(obj.x, obj.y, obj.radius, 0, Math.PI * 2); ctx.fill(); });
+            drawObjects(powerups.map(p => ({...p, type: p.type + '_powerup'})), (obj, color) => { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(obj.x, obj.y, obj.radius, 0, Math.PI * 2); ctx.fill(); });
+            drawPlayer();
+            drawUI();
+
+            gameFrameCount++;
+            requestAnimationFrame(gameLoop);
+        }
+
+        function startGame() { 
+            init(); 
+            gameOver = false; 
+            startScreen.style.display = 'none'; // Ocultar por si acaso
+            tutorialScreen.style.display = 'none'; // Ocultar tutorial
+            gameOverScreen.style.display = 'none'; 
+            gameLoop(); 
+        }
+        function endGame() { 
+            gameOver = true; 
+            finalScoreSpan.textContent = score; 
+            gameOverScreen.style.display = 'flex'; 
+        }
+
+        // --- MANEJADORES DE EVENTOS (CONTROLES) ---
+        function handleDragStart(e) { e.preventDefault(); isDragging = true; startY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY; jumpTriggered = false; }
+        function handleDrag(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            const currentY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+            const deltaY = currentY - startY;
+            
+            if (deltaY < -30 && !jumpTriggered) { jump(); jumpTriggered = true; } 
+            else if (deltaY > 30) { startDuck(); }
+        }
+        function handleDragEnd() { if (!isDragging) return; isDragging = false; endDuck(); }
+
+        canvas.addEventListener('mousedown', handleDragStart);
+        canvas.addEventListener('mousemove', handleDrag);
+        canvas.addEventListener('mouseup', handleDragEnd);
+        canvas.addEventListener('mouseleave', handleDragEnd);
+        canvas.addEventListener('touchstart', handleDragStart, { passive: false });
+        canvas.addEventListener('touchmove', handleDrag, { passive: false });
+        canvas.addEventListener('touchend', handleDragEnd);
+
+        window.addEventListener('keydown', (e) => { 
+            if (e.code === 'ArrowUp' || e.code === 'Space') jump(); 
+            else if (e.code === 'ArrowDown') startDuck(); 
+        });
+        window.addEventListener('keyup', (e) => { if (e.code === 'ArrowDown') endDuck(); });
+        
+        // MEJORA RESPONSIVE: El juego se reinicia si el tamaño de la ventana cambia para re-calcular todo.
+        window.addEventListener('resize', () => {
+            // Solo reinicia si el juego ya está corriendo, no en la pantalla de inicio
+            if (!gameOver && startScreen.style.display === 'none' && tutorialScreen.style.display === 'none') {
+                // CORRECCIÓN: Llamar a startGame() para recalcular todo en lugar de solo init()
+                startGame();
+            }
+        }); 
+
+        // --- FLUJO DE INICIO ---
+        // 1. Botón de inicio muestra el tutorial
+        startButton.addEventListener('click', () => {
+            startScreen.style.display = 'none';
+            tutorialScreen.style.display = 'flex';
+        });
+
+        // 2. Botón de tutorial inicia el juego
+        tutorialStartButton.addEventListener('click', () => {
+            tutorialScreen.style.display = 'none';
+            startGame();
+        });
+
+        // 3. Botón de reinicio salta el tutorial
+        restartButton.addEventListener('click', startGame);
+
+        // --- LÓGICA DE ROTACIÓN DE PANTALLA ---
+
+        // Función para detectar si es probable que sea un dispositivo móvil
+        function isMobileDevice() {
+            // Comprueba si existe 'ontouchstart' o si el navegador reporta puntos táctiles
+            return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        }
+
+        // Mostrar el botón solo en móviles que soporten la API de orientación
+        if (isMobileDevice() && screen.orientation && typeof screen.orientation.lock === 'function') {
+            rotateButton.style.display = 'block'; // Mostrar el botón
+        }
+
+        async function requestLandscape() {
+            try {
+                // Primero, pedir pantalla completa (necesario para bloquear orientación en muchos navegadores)
+                if (!document.fullscreenElement) {
+                    await document.documentElement.requestFullscreen();
+                }
+                
+                // Luego, intentar bloquear la orientación a horizontal
+                // 'landscape' cubre 'landscape-primary' y 'landscape-secondary'
+                await screen.orientation.lock('landscape');
+                console.log("Orientación bloqueada a horizontal.");
+
+            } catch (err) {
+                console.error("Error al intentar bloquear la orientación:", err);
+                // No usamos alert() porque puede estar deshabilitado en el iframe
+                console.warn("No se pudo girar la pantalla. Es posible que el usuario deba hacerlo manualmente.");
+            }
+        }
+
+        rotateButton.addEventListener('click', requestLandscape);
+        // --- FIN DE LÓGICA DE ROTACIÓN ---
+
+        loadAssets();
+    });
+</script>
+
+</body>
+</html>
