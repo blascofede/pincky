@@ -99,8 +99,12 @@
             display: grid;
             grid-template-columns: 1fr; /* Una columna por defecto para móviles */
             gap: 15px;
-            max-width: 90%;
-            width: 800px;
+            
+            /* AJUSTE: Se cambió el ancho fijo por uno responsivo */
+            width: 90%; /* Ocupará el 90% del ancho disponible */
+            max-width: 800px; /* Como máximo, tendrá 800px */
+            box-sizing: border-box; /* Para que el padding no afecte el ancho */
+
             margin-bottom: 25px;
             background: rgba(44, 62, 80, 0.7);
             padding: 20px;
@@ -737,10 +741,15 @@
         
         // MEJORA RESPONSIVE: El juego se reinicia si el tamaño de la ventana cambia para re-calcular todo.
         window.addEventListener('resize', () => {
-            // Solo reinicia si el juego ya está corriendo, no en la pantalla de inicio
+            
+            // AJUSTE: Se modificó la lógica para que SIEMPRE se ajuste la pantalla.
             if (!gameOver && startScreen.style.display === 'none' && tutorialScreen.style.display === 'none') {
-                // CORRECCIÓN: Llamar a startGame() para recalcular todo en lugar de solo init()
+                // Si el juego está corriendo, reinícialo por completo.
                 startGame();
+            } else {
+                // Si estamos en un menú (inicio, tutorial, game over), 
+                // solo necesitamos reajustar el tamaño del canvas y la escala.
+                resizeAndScale();
             }
         }); 
 
