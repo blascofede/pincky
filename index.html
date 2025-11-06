@@ -220,7 +220,8 @@
         // --- MEJORA RESPONSIVE: Lógica de Escalado ---
         // Se define una altura base para el diseño del juego.
         // Todos los tamaños y velocidades se calcularán en relación a esta altura.
-        const BASE_HEIGHT = 900; 
+        // AJUSTE: Reducido de 900 a 800 para aumentar la escala general.
+        const BASE_HEIGHT = 800; 
         let scale = 1;
 
         // Función de ayuda para escalar valores.
@@ -321,13 +322,14 @@
             scale = canvasHeight / BASE_HEIGHT;
             
             // Recalcula todas las constantes del juego basadas en el nuevo factor de escala.
-            playerWidth = s(75);
-            playerHeight = s(110);
-            playerDuckHeight = s(55);
-            jumpPower = s(22);
-            gravity = s(1);
+            // AJUSTE: Aumentados todos los tamaños base.
+            playerWidth = s(90);
+            playerHeight = s(130);
+            playerDuckHeight = s(65);
+            jumpPower = s(24); // Ligeramente más fuerte para compensar
+            gravity = s(1.1); // Ligeramente más fuerte para compensar
             powerupDuration = 480; // Duración en frames (aprox. 8 segundos a 60fps)
-            groundY = canvasHeight - s(60);
+            groundY = canvasHeight - s(70); // Suelo más grueso
         }
         
         function init() {
@@ -375,7 +377,7 @@
             const gap = (newY < lastY) ? Math.random() * s(80) + s(80) : Math.random() * s(150) + s(100);
             const width = Math.random() * s(400) + s(400);
             const newX = lastXEnd + gap;
-            platforms.push({ x: newX, y: newY, width: width, height: s(30), isPopulated: false });
+            platforms.push({ x: newX, y: newY, width: width, height: s(35), isPopulated: false }); // AJUSTE: Plataformas más gruesas
         }
 
         function populatePlatform(platform) {
@@ -396,16 +398,16 @@
                 const random = Math.random();
                 if (random < 0.15) { // Powerup
                     const pTypes = ['destroyer', 'magnet']; // Se quitó 'ghost'
-                    powerups.push({ x: spawnX, y: platform.y - s(45), radius: s(28), type: pTypes[Math.floor(Math.random() * pTypes.length)] });
+                    powerups.push({ x: spawnX, y: platform.y - s(45), radius: s(35), type: pTypes[Math.floor(Math.random() * pTypes.length)] }); // AJUSTE: Powerup más grande
                 } else if (random < 0.55) { // Obstaculo
                     const oTypes = ['breakable']; // Se quitó 'ghost'
                     const type = oTypes[Math.floor(Math.random() * oTypes.length)];
-                    const obstacleHeight = Math.random() * s(50) + s(45);
-                    obstacles.push({ x: spawnX, y: platform.y - obstacleHeight, width: s(55), height: obstacleHeight, type: type });
+                    const obstacleHeight = Math.random() * s(60) + s(55); // AJUSTE: Obstáculo más alto
+                    obstacles.push({ x: spawnX, y: platform.y - obstacleHeight, width: s(65), height: obstacleHeight, type: type }); // AJUSTE: Obstáculo más ancho
                 } else { // Moneda (hueso)
                     let coinY = platform.y - s(35);
                     if (Math.random() < 0.4) coinY = platform.y - s(110);
-                    coins.push({ x: spawnX, y: coinY, radius: s(22) });
+                    coins.push({ x: spawnX, y: coinY, radius: s(30) }); // AJUSTE: Hueso más grande
                 }
                 lastSpawnXOnPlatform = spawnX;
             }
@@ -502,18 +504,20 @@
         function drawUI() {
             ctx.save();
             ctx.fillStyle = '#ecf0f1';
-            ctx.font = `${s(30)}px Arial`;
+            // AJUSTE: Fuente más grande, en negrita y reubicada
+            ctx.font = `bold ${s(40)}px Arial`; 
             ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
             ctx.shadowBlur = 5;
-            ctx.fillText(`Puntuación: ${score}`, s(20), s(40));
+            ctx.fillText(`Huesos: ${score}`, s(25), s(50)); // AJUSTE: Texto y posición
             ctx.restore();
 
             if (player.activePowerup) {
-                const iconSize = s(45);
-                const barWidth = s(120);
-                const barHeight = s(30);
-                const iconX = canvasWidth - barWidth - iconSize - s(30);
-                const iconY = s(20);
+                // AJUSTE: Icono y barra de power-up más grandes
+                const iconSize = s(55);
+                const barWidth = s(160);
+                const barHeight = s(40);
+                const iconX = canvasWidth - barWidth - iconSize - s(35);
+                const iconY = s(25);
                 let powerupImage;
 
                 switch (player.activePowerup) {
@@ -526,9 +530,9 @@
                 if (powerupImage && powerupImage.complete) ctx.drawImage(powerupImage, iconX, iconY, iconSize, iconSize);
                 
                 ctx.fillStyle = '#bdc3c7';
-                ctx.fillRect(iconX + iconSize + s(10), iconY + s(5), barWidth, barHeight);
+                ctx.fillRect(iconX + iconSize + s(10), iconY + s(7.5), barWidth, barHeight);
                 ctx.fillStyle = '#2ecc71';
-                ctx.fillRect(iconX + iconSize + s(10), iconY + s(5), (player.powerupTimer / powerupDuration) * barWidth, barHeight);
+                ctx.fillRect(iconX + iconSize + s(10), iconY + s(7.5), (player.powerupTimer / powerupDuration) * barWidth, barHeight);
             }
         }
 
@@ -609,8 +613,8 @@
         }
 
         function checkCollisions() {
-            // CORRECCIÓN: Se arregló el error de tipeo (era 1MAR)
-            const playerHitbox = { x: player.x + s(15), y: player.y + s(10), width: player.width - s(30), height: player.height - s(15) };
+            // AJUSTE: Hitbox del jugador ajustada a su nuevo tamaño
+            const playerHitbox = { x: player.x + s(20), y: player.y + s(10), width: player.width - s(40), height: player.height - s(15) };
 
             obstacles.forEach((obstacle, index) => {
                 const obstacleHitbox = { x: obstacle.x, y: obstacle.y, width: obstacle.width, height: obstacle.height };
@@ -620,7 +624,7 @@
                     // Lógica simplificada: ya no se comprueba el obstáculo 'ghost' ni el powerup 'ghost'
                     if (obstacle.type === 'breakable' && player.activePowerup === 'destroyer') { 
                         obstacles.splice(index, 1); 
-                        score += 50; 
+                        score += 5; // AJUSTE: Puntuación por destruir virus
                     } else {
                         endGame();
                     }
@@ -630,7 +634,7 @@
             coins.forEach((coin, index) => {
                  // CORRECCIÓN: Se restauró el contenido faltante del bucle
                  if (Math.hypot(player.x + player.width / 2 - coin.x, player.y + player.height / 2 - coin.y) < player.width / 2 + coin.radius) {
-                     score += 10; 
+                     score += 1; // AJUSTE: Puntuación por hueso
                      coins.splice(index, 1);
                  }
             });
@@ -769,17 +773,26 @@
             rotateButton.style.display = 'block'; // Mostrar el botón
         }
 
-        async function requestLandscape() {
+        // AJUSTE: Renombrada la función y modificada la lógica para alternar
+        async function toggleOrientation() {
             try {
                 // Primero, pedir pantalla completa (necesario para bloquear orientación en muchos navegadores)
                 if (!document.fullscreenElement) {
                     await document.documentElement.requestFullscreen();
                 }
                 
-                // Luego, intentar bloquear la orientación a horizontal
-                // 'landscape' cubre 'landscape-primary' y 'landscape-secondary'
-                await screen.orientation.lock('landscape');
-                console.log("Orientación bloqueada a horizontal.");
+                // Comprobar la orientación actual
+                const currentType = screen.orientation.type;
+                
+                if (currentType.startsWith('portrait')) {
+                    // Si está vertical, girar a horizontal
+                    await screen.orientation.lock('landscape');
+                    console.log("Orientación bloqueada a horizontal.");
+                } else if (currentType.startsWith('landscape')) {
+                    // Si está horizontal, girar a vertical
+                    await screen.orientation.lock('portrait');
+                    console.log("Orientación bloqueada a vertical.");
+                }
 
             } catch (err) {
                 console.error("Error al intentar bloquear la orientación:", err);
@@ -788,7 +801,7 @@
             }
         }
 
-        rotateButton.addEventListener('click', requestLandscape);
+        rotateButton.addEventListener('click', toggleOrientation); // AJUSTE: Llamar a la nueva función
         // --- FIN DE LÓGICA DE ROTACIÓN ---
 
         loadAssets();
