@@ -175,12 +175,15 @@
             </div>
             <div class="tutorial-item">
                 <span class="tutorial-icon-text">⬆️</span>
-                <p><strong>Saltar:</strong> Desliza hacia arriba o presiona [Espacio] para saltar. ¡Puedes saltar dos veces!</p>
+                <!-- AJUSTE: Texto del tutorial actualizado -->
+                <p><strong>Saltar:</strong> ¡Pulsa la pantalla o desliza hacia arriba para saltar! Puedes hacerlo dos veces.</p>
             </div>
+            <!-- ELIMINADO: Se quitó el tutorial de Agacharse
             <div class="tutorial-item">
                  <span class="tutorial-icon-text">⬇️</span>
                 <p><strong>Agacharse:</strong> Desliza hacia abajo o presiona [Flecha Abajo] para esquivar.</p>
             </div>
+            -->
             <div class="tutorial-item">
                 <img src="assets/virus.png" alt="Virus" class="tutorial-icon">
                 <p><strong>Evita los Virus:</strong> ¡No dejes que te toquen 🦠!</p>
@@ -203,6 +206,10 @@
         <h1 class="title-with-paws">Juego Terminado 😿</h1>
         <p>Puntuación Final: <span id="finalScore">0</span></p>
         <button id="restartButton">🐾 Jugar de Nuevo</button>
+        <!-- BOTÓN DE ROTACIÓN AÑADIDO (COPIADO) -->
+        <button id="rotateButtonGameOver" style="margin-top: 20px; background: #3a86ff; color: white; border-color: #0055d4; display: none; padding: clamp(10px, 2.5vw, 18px) clamp(20px, 4vw, 36px); font-size: clamp(0.9rem, 2.2vw, 1.3rem); font-weight: bold; border-radius: 10px; cursor: pointer;">
+            Girar Pantalla 🔄
+        </button>
     </div>
 </div>
 
@@ -220,6 +227,7 @@
         const tutorialStartButton = document.getElementById('tutorialStartButton'); // Tutorial button
         const finalScoreSpan = document.getElementById('finalScore');
         const rotateButton = document.getElementById('rotateButton'); // Botón de rotación
+        const rotateButtonGameOver = document.getElementById('rotateButtonGameOver'); // AJUSTE: Botón de rotación en Game Over
         
         // --- MEJORA RESPONSIVE: Lógica de Escalado ---
         // Se define una altura base para el diseño del juego.
@@ -255,6 +263,7 @@
         let isDragging = false;
         let startY = 0;
         let jumpTriggered = false;
+        let touchStartTime = 0; // AJUSTE: Para detectar "tap"
 
         function loadAssets() {
             // CORRECCIÓN: Se añade la ruta 'assets/' para que coincida con la estructura de carpetas y solucionar los errores de carga.
@@ -509,19 +518,19 @@
             ctx.save();
             ctx.fillStyle = '#ecf0f1';
             // AJUSTE: Fuente más grande, en negrita y reubicada
-            ctx.font = `bold ${s(40)}px Arial`; 
+            ctx.font = `bold ${s(48)}px Arial`; // AJUSTE: Más grande
             ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
             ctx.shadowBlur = 5;
-            ctx.fillText(`Huesos: ${score}`, s(25), s(50)); // AJUSTE: Texto y posición
+            ctx.fillText(`Huesos: ${score}`, s(25), s(55)); // AJUSTE: Texto y posición
             ctx.restore();
 
             if (player.activePowerup) {
                 // AJUSTE: Icono y barra de power-up más grandes
-                const iconSize = s(55);
-                const barWidth = s(160);
-                const barHeight = s(40);
-                const iconX = canvasWidth - barWidth - iconSize - s(35);
-                const iconY = s(25);
+                const iconSize = s(65); // AJUSTE: Más grande
+                const barWidth = s(180); // AJUSTE: Más grande
+                const barHeight = s(45); // AJUSTE: Más grande
+                const iconX = canvasWidth - barWidth - iconSize - s(40); // AJUSTE: Más padding
+                const iconY = s(20); // AJUSTE: Reubicado
                 let powerupImage;
 
                 switch (player.activePowerup) {
@@ -534,9 +543,9 @@
                 if (powerupImage && powerupImage.complete) ctx.drawImage(powerupImage, iconX, iconY, iconSize, iconSize);
                 
                 ctx.fillStyle = '#bdc3c7';
-                ctx.fillRect(iconX + iconSize + s(10), iconY + s(7.5), barWidth, barHeight);
+                ctx.fillRect(iconX + iconSize + s(10), iconY + s(10), barWidth, barHeight); // AJUSTE: Alineación Y
                 ctx.fillStyle = '#2ecc71';
-                ctx.fillRect(iconX + iconSize + s(10), iconY + s(7.5), (player.powerupTimer / powerupDuration) * barWidth, barHeight);
+                ctx.fillRect(iconX + iconSize + s(10), iconY + s(10), (player.powerupTimer / powerupDuration) * barWidth, barHeight); // AJUSTE: Alineación Y
             }
         }
 
@@ -713,7 +722,13 @@
         }
 
         // --- MANEJADORES DE EVENTOS (CONTROLES) ---
-        function handleDragStart(e) { e.preventDefault(); isDragging = true; startY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY; jumpTriggered = false; }
+        function handleDragStart(e) { 
+            e.preventDefault(); 
+            isDragging = true; 
+            startY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY; 
+            jumpTriggered = false; 
+            touchStartTime = Date.now(); // AJUSTE: Registrar tiempo de inicio
+        }
         function handleDrag(e) {
             if (!isDragging) return;
             e.preventDefault();
@@ -723,15 +738,42 @@
             if (deltaY < -30 && !jumpTriggered) { jump(); jumpTriggered = true; } 
             else if (deltaY > 30) { startDuck(); }
         }
-        function handleDragEnd() { if (!isDragging) return; isDragging = false; endDuck(); }
+        function handleDragEnd(e) { 
+            if (!isDragging) return;
+            isDragging = false; // Mover al inicio
+
+            const duration = Date.now() - touchStartTime;
+            let currentY = startY; // Valor por defecto
+
+            // Obtener la posición Y final de forma segura
+            if (e.type === 'touchend' && e.changedTouches.length > 0) {
+                currentY = e.changedTouches[0].clientY;
+            } else if (e.type === 'mouseup') {
+                currentY = e.clientY;
+            }
+            // Si es 'mouseleave', currentY se mantiene como startY (deltaY será 0)
+
+            const deltaY = currentY - startY;
+
+            // AJUSTE: Lógica de "Tap" para saltar
+            // Si el toque fue corto (menos de 250ms) Y no se movió mucho verticalmente (menos de 30px)
+            // Y no se disparó ya un salto (por deslizar rápido)
+            if (duration < 250 && Math.abs(deltaY) < 30 && !jumpTriggered) {
+                jump();
+            }
+
+            endDuck(); 
+        }
 
         canvas.addEventListener('mousedown', handleDragStart);
         canvas.addEventListener('mousemove', handleDrag);
-        canvas.addEventListener('mouseup', handleDragEnd);
-        canvas.addEventListener('mouseleave', handleDragEnd);
+        // AJUSTE: Pasar el evento 'e' a handleDragEnd
+        canvas.addEventListener('mouseup', (e) => handleDragEnd(e));
+        canvas.addEventListener('mouseleave', (e) => handleDragEnd(e));
         canvas.addEventListener('touchstart', handleDragStart, { passive: false });
         canvas.addEventListener('touchmove', handleDrag, { passive: false });
-        canvas.addEventListener('touchend', handleDragEnd);
+        // AJUSTE: Pasar el evento 'e' a handleDragEnd
+        canvas.addEventListener('touchend', (e) => handleDragEnd(e));
 
         window.addEventListener('keydown', (e) => { 
             if (e.code === 'ArrowUp' || e.code === 'Space') jump(); 
@@ -780,6 +822,7 @@
         // Mostrar el botón solo en móviles que soporten la API de orientación
         if (isMobileDevice() && screen.orientation && typeof screen.orientation.lock === 'function') {
             rotateButton.style.display = 'block'; // Mostrar el botón
+            rotateButtonGameOver.style.display = 'block'; // AJUSTE: Mostrar el botón en Game Over
         }
 
         // AJUSTE: Renombrada la función y modificada la lógica para alternar
@@ -811,6 +854,7 @@
         }
 
         rotateButton.addEventListener('click', toggleOrientation); // AJUSTE: Llamar a la nueva función
+        rotateButtonGameOver.addEventListener('click', toggleOrientation); // AJUSTE: Añadir listener al nuevo botón
         // --- FIN DE LÓGICA DE ROTACIÓN ---
 
         loadAssets();
